@@ -5,8 +5,6 @@
 #include "HKXMapping.h"
 
 namespace hkxparse {
-	struct LayoutRules;
-
 	class HKXFile {
 	public:
 		HKXFile();
@@ -20,8 +18,6 @@ namespace hkxparse {
 	private:
 		void doLoadFile();
 		void parsePackfile();
-
-		void fixup(unsigned char *data, size_t dataSize, const LayoutRules &layoutRules, size_t offset, size_t target);
 
 		HKXMapping m_mapping;
 	};
