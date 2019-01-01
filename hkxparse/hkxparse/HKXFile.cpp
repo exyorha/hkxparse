@@ -1,6 +1,7 @@
 #include <hkxparse/HKXFile.h>
 #include <hkxparse/PackfileTypes.h>
 #include <hkxparse/HKXPackfileLoader.h>
+#include <hkxparse/PrettyPrinter.h>
 
 #include <fstream>
 
@@ -61,6 +62,16 @@ namespace hkxparse {
 	void HKXFile::parsePackfile() {
 		HKXPackfileLoader loader(m_mapping);
 		auto root = loader.loadRoot();
+
+		{
+			std::ofstream stream;
+			stream.exceptions(std::ios::failbit | std::ios::eofbit | std::ios::badbit);
+			stream.open("C:\\projects\\hkxparse\\dump.txt", std::ios::out | std::ios::trunc);
+
+			PrettyPrinter printer(stream);
+			printer.print(root);
+		}
+
 		__debugbreak();
 	}
 

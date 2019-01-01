@@ -51,7 +51,8 @@ namespace hkxparse {
 		HKXStructRef, // Pointer (some types of)
 		HKXArray, // Array, InPlaceArray, SimpleArray, HomogeneousArray, RelArray
 		std::string, // CString, StringPtr
-		HKXStruct // Struct
+		HKXStruct, // Struct
+		std::vector<unsigned char> // Arrays of Int8, UInt8
 	>;
 
 	struct HKXStruct {

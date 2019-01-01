@@ -479,19 +479,29 @@ namespace hkxparse {
 
 		case HavokType::Array:
 		{
-			value = HKXArray();
-			auto &ary = std::get<HKXArray>(value);
 
 			uint64_t ptr;
 			uint32_t len;
 			stream.readPointer(ptr);
 			stream >> len;
-
+			
 			Deserializer arrayStream(stream.layoutRules(), m_mapping.data() + ptr, static_cast<size_t>(m_mapping.size() - ptr));
-			ary.values.resize(len);
 
-			for (size_t index = 0; index < len; index++) {
-				deserializeField(arrayStream, member, member.subtype, ary.values[index]);
+			if (member.subtype == HavokType::Int8 || member.subtype == HavokType::UInt8) {
+				std::vector<unsigned char> data(len);
+				arrayStream.readBytes(data.data(), data.size());
+
+				value = std::move(data);
+			}
+			else {
+				value = HKXArray();
+				auto &ary = std::get<HKXArray>(value);
+
+				ary.values.resize(len);
+
+				for (size_t index = 0; index < len; index++) {
+					deserializeField(arrayStream, member, member.subtype, ary.values[index]);
+				}
 			}
 
 			break;

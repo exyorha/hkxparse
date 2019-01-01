@@ -6,11 +6,13 @@ add_library(hkxparse STATIC
 	include/hkxparse/HKXTypes.h
 	include/hkxparse/LayoutRules.h
 	include/hkxparse/PackfileTypes.h
+	include/hkxparse/PrettyPrinter.h
 	hkxparse/Deserializer.cpp
 	hkxparse/HKXFile.cpp
 	hkxparse/HKXMapping.cpp
 	hkxparse/HKXPackfileLoader.cpp
 	hkxparse/HKXTypes.cpp
+	hkxparse/PrettyPrinter.cpp
 )
 
 target_include_directories(hkxparse PUBLIC include)
