@@ -158,22 +158,16 @@ namespace hkxparse {
 	}
 	
 	bool HKXPackfileLoader::classMayHaveVtable(const HavokClass *classReflection) const {
-		const auto &header = *reinterpret_cast<PackfileHeader *>(m_mapping.data());
+		auto begin = m_layout->typeInfos;
+		auto end = m_layout->typeInfos + m_layout->typeInfoCount;
+		auto classIt = std::lower_bound(begin, end, classReflection->name, [](const HavokTypeInfo *hClass, const char *hClassName) {
+			return strcmp(hClass->name, hClassName) < 0;
+		});
 
-		if (classReflection->parent) {
-			if (!classMayHaveVtable(classReflection->parent))
-				return false;
-		}
-
-		if (classReflection->objectSize < header.layoutRules.bytesInPointer) {
+		if (classIt == end || strcmp((*classIt)->name, classReflection->name) != 0)
 			return false;
-		}
 
-		if (classReflection->numDeclaredMembers > 0 && classReflection->declaredMembers[0].offset < header.layoutRules.bytesInPointer) {
-			return false;
-		}
-
-		return true;
+		return (*classIt)->vtable != 0;
 	}
 
 	HKXStructRef HKXPackfileLoader::loadRoot() {
@@ -197,9 +191,9 @@ namespace hkxparse {
 			auto ptr = std::make_shared<HKXStruct>();
 			m_structures.emplace(pointer, ptr);
 
-			printf("pointer: %u\n", pointer);
+			printf("pointer: %llu\n", pointer);
 
-			Deserializer stream(layoutRules, m_mapping.data() + pointer, m_mapping.size() - pointer);
+			Deserializer stream(layoutRules, m_mapping.data() + pointer, m_mapping.size() - static_cast<size_t>(pointer));
 
 			parseStructure(classArg, stream, *ptr);
 

@@ -5,7 +5,10 @@
 
 namespace hkxparse {
 	static const struct HavokPackfileLayout packfileLayouts[] = {
-		{ "hk_2010.2.0-r1", { 4, 1, 0, 1 }, hk_2010_2_0_r1_1_0_1_4Classes, sizeof(hk_2010_2_0_r1_1_0_1_4Classes) / sizeof(hk_2010_2_0_r1_1_0_1_4Classes[0]) },
+		{ "hk_2010.2.0-r1", { 4, 1, 0, 1 },
+			hk_2010_2_0_r1_1_0_1_4Classes, sizeof(hk_2010_2_0_r1_1_0_1_4Classes) / sizeof(hk_2010_2_0_r1_1_0_1_4Classes[0]),
+			hk_2010_2_0_r1_1_0_1_4TypeInfo, sizeof(hk_2010_2_0_r1_1_0_1_4TypeInfo) / sizeof(hk_2010_2_0_r1_1_0_1_4TypeInfo[0])
+		},
 	};
 
 	const HavokPackfileLayout *findLayout(const char *name, const unsigned char *layoutRules) {

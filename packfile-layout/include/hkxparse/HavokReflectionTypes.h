@@ -80,6 +80,11 @@ namespace hkxparse {
 		uint32_t flags;
 		uint32_t describedVersion;
 	};
+
+	struct HavokTypeInfo {
+		const char *name;
+		uint64_t vtable;
+	};
 }
 
 #endif

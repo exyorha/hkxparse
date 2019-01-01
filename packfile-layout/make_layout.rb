@@ -25,14 +25,19 @@ namespace hkxparse {
 namespace #{layout_name} {
 EOF
 
-	layout["classes"].each do |class_name, class_info|
-		outf.puts "extern const HavokClass #{class_name}Class;"
+	layout["classes"].each do |class_info|
+		outf.puts "extern const HavokClass #{class_info["name"]}Class;"
 	end
 
-	
-	layout["classes"].each do |class_name, class_info|
+	layout["typeinfo"].each do |typeinfo|
+		outf.puts "extern const HavokTypeInfo #{typeinfo["name"]}TypeInfo;"
+	end
+
+	layout["classes"].each do |class_info|
+		class_name = class_info["name"]
+
 		enums = class_info["enums"]
-		 
+
 		if enums.size > 0
 			enums.each do |enum|
 				items = enum["items"]
@@ -66,21 +71,21 @@ EOF
 					outf.puts "    nullptr,"
 				end
 				outf.puts "    #{items.size},"
-				
+
 				outf.puts "  },"
 			end
 
 			outf.puts "};"
 		end
-		
+
 		members = class_info["members"]
-		 
+
 		if members.size > 0
 			outf.puts "static const HavokClassMember #{class_name}ClassMembers[] = {"
 
 			members.each do |member|
 				outf.puts "  {"
-				
+
 				outf.puts "    #{member["name"].inspect},"
 
 				if member["class"].nil?
@@ -97,7 +102,7 @@ EOF
 
 				outf.puts "  },"
 			end
-			
+
 			outf.puts "};"
 		end
 
@@ -119,7 +124,7 @@ EOF
 			outf.puts "  nullptr,"
 		end
 		outf.puts "  #{enums.size},"
-		
+
 		if members.size > 0
 			outf.puts "  #{class_name}ClassMembers,"
 		else
@@ -133,12 +138,27 @@ EOF
 		outf.puts "};"
 	end
 
+	layout["typeinfo"].each do |typeinfo|
+		outf.puts "const HavokTypeInfo #{typeinfo["name"]}TypeInfo = {"
+		outf.puts "  #{typeinfo["name"].inspect},"
+		outf.puts "  #{typeinfo["vtable"]},"
+		outf.puts "};"
+	end
+
 	outf.puts "}";
 
 	outf.puts "const HavokClass *const #{layout_name}Classes[] = {"
 
-	layout["classes"].values.sort_by { |val| val["name"] }.each do |klass|
+	layout["classes"].sort_by { |val| val["name"] }.each do |klass|
 		outf.puts "  &#{layout_name}::#{klass["name"]}Class,"
+	end
+
+	outf.puts "};"
+	
+	outf.puts "const HavokTypeInfo *const #{layout_name}TypeInfo[] = {"
+
+	layout["typeinfo"].sort_by { |val| val["name"] }.each do |klass|
+		outf.puts "  &#{layout_name}::#{klass["name"]}TypeInfo,"
 	end
 
 	outf.puts "};"
@@ -156,12 +176,13 @@ File.open(header_filename, "w") do |outf|
 
 namespace hkxparse {
 	struct HavokClass;
+	struct HavokTypeInfo;
 
 	extern const HavokClass *const #{layout_name}Classes[#{layout["classes"].size}];
+	extern const HavokTypeInfo *const #{layout_name}TypeInfo[#{layout["typeinfo"].size}];
 }
 
 #endif
 EOF
 
 end
-
