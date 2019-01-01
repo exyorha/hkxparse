@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <sstream>
 
+#include <half.h>
+
 namespace hkxparse {
 
 	HKXPackfileLoader::HKXPackfileLoader(HKXMapping &mapping) : m_mapping(mapping) {
@@ -167,6 +169,8 @@ namespace hkxparse {
 		if (classIt == end || strcmp((*classIt)->name, classReflection->name) != 0)
 			return false;
 
+		printf("vtable for %s is %08llX\n", classReflection->name, (*classIt)->vtable);
+
 		return (*classIt)->vtable != 0;
 	}
 
@@ -235,44 +239,50 @@ namespace hkxparse {
 	void HKXPackfileLoader::parseStructure(const HavokClass *classReflection, Deserializer &stream, HKXStruct &target, bool nested) {
 		if (!nested) {
 			if (classMayHaveVtable(classReflection)) {
+				printf("checking for override of %s\n", classReflection->name);
 				uint64_t className;
 
 				stream.mark();
 				stream.readPointer(className);
 				stream.seekFromMark(0);
 
-				auto classNameStr = reinterpret_cast<char *>(m_mapping.data() + className);
+				if (className != 0) {
 
-				bool classFound = false;
+					auto classNameStr = reinterpret_cast<char *>(m_mapping.data() + className);
+
+					bool classFound = false;
 
 
-				auto begin = m_layout->classes;
-				auto end = m_layout->classes + m_layout->classCount;
-				auto classIt = std::lower_bound(begin, end, classNameStr, [](const HavokClass *hClass, const char *hClassName) {
-					return strcmp(hClass->name, hClassName) < 0;
-				});
+					auto begin = m_layout->classes;
+					auto end = m_layout->classes + m_layout->classCount;
+					auto classIt = std::lower_bound(begin, end, classNameStr, [](const HavokClass *hClass, const char *hClassName) {
+						return strcmp(hClass->name, hClassName) < 0;
+					});
 
-				if (classIt == end || strcmp((*classIt)->name, classNameStr) != 0) {
-					std::stringstream error;
-					error << "No definition for class " << className;
-					throw std::runtime_error(error.str());
-				}
+					if (classIt == end || strcmp((*classIt)->name, classNameStr) != 0) {
+						std::stringstream error;
+						error << "No definition for class " << classNameStr;
+						throw std::runtime_error(error.str());
+					}
 
-				for (auto classInChain = *classIt; classInChain; classInChain = classInChain->parent) {
-					if (classInChain == classReflection) {
-						classFound = true;
+					for (auto classInChain = *classIt; classInChain; classInChain = classInChain->parent) {
+						if (classInChain == classReflection) {
+							classFound = true;
+						}
+					}
+
+					if (!classFound) {
+						std::stringstream error;
+						error << "VTable mismatch: vtable points to " << classNameStr << ", but it is not derived from " << classReflection->name;
+						throw std::runtime_error(error.str());
+					}
+
+					if (*classIt != classReflection) {
+						printf("renamed %s to %s\n", classReflection->name, classNameStr);
+
+						classReflection = *classIt;
 					}
 				}
-
-				if (!classFound) {
-					std::stringstream error;
-					error << "VTable mismatch: vtable points to " << classNameStr << ", but it is not derived from " << classReflection->name;
-					throw std::runtime_error(error.str());
-				}
-
-				printf("renamed %s to %s\n", classReflection->name, classNameStr);
-
-				classReflection = *classIt;
 			}
 		}
 
@@ -537,8 +547,19 @@ namespace hkxparse {
 			break;
 
 		case HavokType::Half:
-			__debugbreak();
+		{
+			uint16_t val;
+			stream >> val;
+
+			union {
+				float f;
+				uint32_t i;
+			} u;
+
+			u.i = half_to_float(val);
+			value = u.f;
 			break;
+		}
 
 		case HavokType::StringPtr:
 		{

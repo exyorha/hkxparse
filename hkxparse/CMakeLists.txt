@@ -14,5 +14,5 @@ add_library(hkxparse STATIC
 )
 
 target_include_directories(hkxparse PUBLIC include)
-target_link_libraries(hkxparse PRIVATE hkxparse-packfile-layout)
+target_link_libraries(hkxparse PRIVATE hkxparse-packfile-layout halffloat)
 
