@@ -64,7 +64,7 @@ namespace hkxparse {
 
 				uint32_t offset;
 				uint32_t target;
-				while (true) {
+				while (!stream.atEnd()) {
 					stream >> offset;
 
 					if (offset == 0xFFFFFFFF)
@@ -84,7 +84,7 @@ namespace hkxparse {
 				uint32_t offset;
 				uint32_t section;
 				uint32_t target;
-				while (true) {
+				while (!stream.atEnd()) {
 					stream >> offset;
 
 					if (offset == 0xFFFFFFFF)
@@ -109,7 +109,7 @@ namespace hkxparse {
 				uint32_t section;
 				uint32_t target;
 
-				while (true) {
+				while (!stream.atEnd()) {
 					stream >> offset;
 
 					if (offset == 0xFFFFFFFF)
@@ -167,7 +167,7 @@ namespace hkxparse {
 		});
 
 		if (classIt == end || strcmp((*classIt)->name, classReflection->name) != 0)
-			return false;
+			return true;
 
 		printf("vtable for %s is %08llX\n", classReflection->name, (*classIt)->vtable);
 
@@ -485,6 +485,8 @@ namespace hkxparse {
 			stream.readPointer(ptr);
 			stream >> len;
 			
+			printf("array: ptr %llu, length %u\n", ptr, len);
+
 			Deserializer arrayStream(stream.layoutRules(), m_mapping.data() + ptr, static_cast<size_t>(m_mapping.size() - ptr));
 
 			if (member.subtype == HavokType::Int8 || member.subtype == HavokType::UInt8) {

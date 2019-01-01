@@ -38,6 +38,8 @@ namespace hkxparse {
 
 		void seekFromMark(size_t offset);
 
+		bool atEnd() const { return m_ptr == m_end; }
+
 	private:
 		LayoutRules m_layoutRules;
 		const unsigned char *m_ptr;

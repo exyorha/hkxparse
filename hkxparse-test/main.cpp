@@ -2,5 +2,5 @@
 
 int main(int argc, char *argv[]) {
 	hkxparse::HKXFile file;
-	file.loadFile("C:\\projects\\nifparse\\meshes\\classic\\skeleton.hkx");
+	file.loadFile("C:\\projects\\nifparse\\meshes\\classic\\mtidle_hover.hkx");
 }
