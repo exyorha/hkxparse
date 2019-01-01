@@ -22,7 +22,9 @@ namespace hkxparse {
 
 
 	void Deserializer::readBool(bool &val) {
-		__debugbreak();
+		uint32_t uval;
+		*this >> uval;
+		val = uval != 0;
 	}
 
 	void Deserializer::readPointer(uint64_t &val) {

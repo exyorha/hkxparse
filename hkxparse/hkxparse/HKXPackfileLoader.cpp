@@ -21,6 +21,17 @@ namespace hkxparse {
 			throw std::runtime_error("unsupported packfile version");
 		}
 
+		m_layout = findLayout(header.contentsVersion, reinterpret_cast<const unsigned char *>(&header.layoutRules));
+		if (!m_layout) {
+			std::stringstream error;
+			error << "No packfile layout for version " << header.contentsVersion << ", layout rules " <<
+				static_cast<unsigned int>(header.layoutRules.bytesInPointer) << "-" <<
+				static_cast<unsigned int>(header.layoutRules.littleEndian) << "-" <<
+				static_cast<unsigned int>(header.layoutRules.reusePaddingOptimization) << "-" <<
+				static_cast<unsigned int>(header.layoutRules.emptyBaseClassOptimization);
+			throw std::runtime_error(error.str());
+		}
+
 		auto sectionHeaders = reinterpret_cast<const PackfileSectionHeader *>(&header + 1);
 
 		for (int32_t sectionIndex = 0; sectionIndex < header.numSections; sectionIndex++) {
@@ -110,7 +121,21 @@ namespace hkxparse {
 
 					auto className = reinterpret_cast<char *>(m_mapping.data() + sectionHeaders[section].absoluteDataStart + target);
 
-					printf("offset: %u, target: %s\n", offset, className);
+					auto begin = m_layout->classes;
+					auto end = m_layout->classes + m_layout->classCount;
+					auto classIt = std::lower_bound(begin, end, className, [](const HavokClass *hClass, const char *hClassName) {
+						return strcmp(hClass->name, hClassName) < 0;
+					});
+
+					if (classIt == end || strcmp((*classIt)->name, className) != 0) {
+						std::stringstream error;
+						error << "No definition for class " << className;
+						throw std::runtime_error(error.str());
+					}
+
+					if (classMayHaveVtable(*classIt)) {
+						fixup(data, dataSize, header.layoutRules, offset, sectionHeaders[section].absoluteDataStart + target);\
+					}
 				}
 			}
 
@@ -126,21 +151,29 @@ namespace hkxparse {
 				Deserializer stream(header.layoutRules, imports, importsSize);
 			}
 		}
-
-		m_layout = findLayout(header.contentsVersion, reinterpret_cast<const unsigned char *>(&header.layoutRules));
-		if (!m_layout) {
-			std::stringstream error;
-			error << "No packfile layout for version " << header.contentsVersion << ", layout rules " <<
-				static_cast<unsigned int>(header.layoutRules.bytesInPointer) << "-" <<
-				static_cast<unsigned int>(header.layoutRules.littleEndian) << "-" <<
-				static_cast<unsigned int>(header.layoutRules.reusePaddingOptimization) << "-" <<
-				static_cast<unsigned int>(header.layoutRules.emptyBaseClassOptimization);
-			throw std::runtime_error(error.str());
-		}
 	}	
 
 	HKXPackfileLoader::~HKXPackfileLoader() {
 
+	}
+	
+	bool HKXPackfileLoader::classMayHaveVtable(const HavokClass *classReflection) const {
+		const auto &header = *reinterpret_cast<PackfileHeader *>(m_mapping.data());
+
+		if (classReflection->parent) {
+			if (!classMayHaveVtable(classReflection->parent))
+				return false;
+		}
+
+		if (classReflection->objectSize < header.layoutRules.bytesInPointer) {
+			return false;
+		}
+
+		if (classReflection->numDeclaredMembers > 0 && classReflection->declaredMembers[0].offset < header.layoutRules.bytesInPointer) {
+			return false;
+		}
+
+		return true;
 	}
 
 	HKXStructRef HKXPackfileLoader::loadRoot() {
@@ -156,10 +189,15 @@ namespace hkxparse {
 
 	template<typename ClassArgType>
 	HKXStructRef HKXPackfileLoader::parseStructureAtPointer(const LayoutRules &layoutRules, uint64_t pointer, ClassArgType classArg) {
+		if (!pointer)
+			return HKXStructRef();
+
 		auto it = m_structures.find(pointer);
 		if (it == m_structures.end()) {
 			auto ptr = std::make_shared<HKXStruct>();
 			m_structures.emplace(pointer, ptr);
+
+			printf("pointer: %u\n", pointer);
 
 			Deserializer stream(layoutRules, m_mapping.data() + pointer, m_mapping.size() - pointer);
 
@@ -200,9 +238,55 @@ namespace hkxparse {
 		return parseStructure(*classIt, stream, target);
 	}		
 	
-	void HKXPackfileLoader::parseStructure(const HavokClass *classReflection, Deserializer &stream, HKXStruct &target) {
+	void HKXPackfileLoader::parseStructure(const HavokClass *classReflection, Deserializer &stream, HKXStruct &target, bool nested) {
+		if (!nested) {
+			if (classMayHaveVtable(classReflection)) {
+				uint64_t className;
+
+				stream.mark();
+				stream.readPointer(className);
+				stream.seekFromMark(0);
+
+				auto classNameStr = reinterpret_cast<char *>(m_mapping.data() + className);
+
+				bool classFound = false;
+
+
+				auto begin = m_layout->classes;
+				auto end = m_layout->classes + m_layout->classCount;
+				auto classIt = std::lower_bound(begin, end, classNameStr, [](const HavokClass *hClass, const char *hClassName) {
+					return strcmp(hClass->name, hClassName) < 0;
+				});
+
+				if (classIt == end || strcmp((*classIt)->name, classNameStr) != 0) {
+					std::stringstream error;
+					error << "No definition for class " << className;
+					throw std::runtime_error(error.str());
+				}
+
+				for (auto classInChain = *classIt; classInChain; classInChain = classInChain->parent) {
+					if (classInChain == classReflection) {
+						classFound = true;
+					}
+				}
+
+				if (!classFound) {
+					std::stringstream error;
+					error << "VTable mismatch: vtable points to " << classNameStr << ", but it is not derived from " << classReflection->name;
+					throw std::runtime_error(error.str());
+				}
+
+				printf("renamed %s to %s\n", classReflection->name, classNameStr);
+
+				classReflection = *classIt;
+			}
+		}
+
+		printf("deserializing %s, nested %d\n", classReflection->name, nested);
+
 		if (classReflection->parent) {
-			parseStructure(classReflection->parent, stream, target);
+			parseStructure(classReflection->parent, stream, target, true);
+			printf("back to %s\n", classReflection->name);
 		}
 
 		target.classNames.emplace_back(classReflection->name);
@@ -214,11 +298,18 @@ namespace hkxparse {
 
 			printf("member: %s, type: %u, subtype: %u, array size: %u, flags: %u, offset: %u\n", member.name, member.type, member.subtype, member.arraySize, member.flags, member.offset);
 
-			auto &it = target.fields.emplace(member.name, std::monostate());
-			deserializeField(stream, member, it.first->second);
+			if (!(member.flags & 1024)) {
+				auto &it = target.fields.emplace(member.name, std::monostate());
+				deserializeField(stream, member, it.first->second);
+			}
 		}
 
-		stream.seekFromMark(classReflection->objectSize);
+		if (nested) {
+			stream.seekFromMark(0);
+		}
+		else {
+			stream.seekFromMark(classReflection->objectSize);
+		}
 	}
 
 	void HKXPackfileLoader::deserializeField(Deserializer &stream, const HavokClassMember &member, HKXVariant &value) {
@@ -369,7 +460,7 @@ namespace hkxparse {
 			uint64_t ptr;
 			stream.readPointer(ptr);
 
-			if (member.subtype == HavokType::Struct) {
+			if (member.subtype == HavokType::Struct || (member.subtype == HavokType::Pointer && member.typeClass)) {
 				value = parseStructureAtPointer(stream.layoutRules(), ptr, member.typeClass);
 			}
 			else {
@@ -407,15 +498,21 @@ namespace hkxparse {
 			break;
 
 		case HavokType::Enum:
-			__debugbreak();
+			deserializeField(stream, member, member.subtype, value);
 			break;
 
 		case HavokType::Struct:
+		{
 			value = HKXStruct();
+
+			auto mark = stream.getMark();
 
 			parseStructure(member.typeClass, stream, std::get<HKXStruct>(value));
 
+			stream.mark(mark);
+
 			break;
+		}
 
 		case HavokType::SimpleArray:
 			__debugbreak();

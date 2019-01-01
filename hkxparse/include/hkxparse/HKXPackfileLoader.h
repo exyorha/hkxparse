@@ -23,9 +23,10 @@ namespace hkxparse {
 	private:
 		void fixup(unsigned char *data, size_t dataSize, const LayoutRules &layoutRules, size_t offset, size_t target);
 		void parseStructure(const char *className, Deserializer &stream, HKXStruct &target);
-		void parseStructure(const HavokClass *classReflection, Deserializer &stream, HKXStruct &target);
+		void parseStructure(const HavokClass *classReflection, Deserializer &stream, HKXStruct &target, bool nested = false);
 		void deserializeField(Deserializer &stream, const HavokClassMember &member, HKXVariant &value); 
 		void deserializeField(Deserializer &stream, const HavokClassMember &member, HavokType type, HKXVariant &value);
+		bool classMayHaveVtable(const HavokClass *classReflection) const;
 
 		template<typename ClassArgType>
 		HKXStructRef parseStructureAtPointer(const LayoutRules &layoutRules, uint64_t pointer, ClassArgType classArg);

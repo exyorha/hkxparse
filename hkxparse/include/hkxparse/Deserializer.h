@@ -33,6 +33,9 @@ namespace hkxparse {
 		inline const LayoutRules &layoutRules() const { return m_layoutRules; }
 
 		void mark();
+		inline void mark(const unsigned char *ptr) { m_mark = ptr; }
+		inline const unsigned char *getMark() const { return m_mark; }
+
 		void seekFromMark(size_t offset);
 
 	private:
