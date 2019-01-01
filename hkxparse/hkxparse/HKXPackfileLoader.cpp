@@ -91,6 +91,27 @@ namespace hkxparse {
 				printf("%s: %zu bytes of virtual fixups\n", section.sectionTag, virtualFixupsSize);
 
 				Deserializer stream(header.layoutRules, virtualFixups, virtualFixupsSize);
+
+				uint32_t offset;
+				uint32_t section;
+				uint32_t target;
+
+				while (true) {
+					stream >> offset;
+
+					if (offset == 0xFFFFFFFF)
+						break;
+
+					stream >> section >> target;
+
+					if (section >= static_cast<uint32_t>(header.numSections)) {
+						throw std::runtime_error("section index is out of range in global fixup");
+					}
+
+					auto className = reinterpret_cast<char *>(m_mapping.data() + sectionHeaders[section].absoluteDataStart + target);
+
+					printf("offset: %u, target: %s\n", offset, className);
+				}
 			}
 
 			if (exportsSize != 0) {
