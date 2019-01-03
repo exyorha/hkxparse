@@ -7,8 +7,24 @@ namespace hkxparse {
 
 	}
 
+	Deserializer::Deserializer() : m_ptr(nullptr), m_end(nullptr), m_mark(nullptr) {
+
+	}
+
 	Deserializer::~Deserializer() {
 
+	}
+
+	Deserializer::Deserializer(Deserializer &&other) : m_ptr(nullptr), m_end(nullptr), m_mark(nullptr) {
+		*this = std::move(other);
+	}
+
+	Deserializer &Deserializer::operator =(Deserializer &&other) {
+		this->m_layoutRules = other.m_layoutRules;
+		std::swap(m_ptr, other.m_ptr);
+		std::swap(m_end, other.m_end);
+		std::swap(m_mark, other.m_mark);
+		return *this;
 	}
 
 	void Deserializer::readBytes(unsigned char *target, size_t size) {
@@ -220,4 +236,33 @@ namespace hkxparse {
 
 		m_ptr = target;
 	}
+
+	uint8_t Deserializer::readByte() {
+		if (m_ptr == m_end) {
+			throw std::runtime_error("out of bounds read");
+		}
+
+		return *m_ptr++;
+	}
+
+	int32_t Deserializer::readVarInt() {
+		auto byte = readByte();
+		bool negative = byte & 1;
+		uint32_t value = (byte & 0x7E) >> 1;
+		size_t pos = 6;
+
+		while (byte & 0x80) {
+			byte = readByte();
+			value |= (byte & 0x7F) << pos;
+			pos += 7;
+		}
+
+		if (negative) {
+			return -static_cast<int32_t>(value);
+		}
+		else {
+			return static_cast<int32_t>(value);
+		}
+	}
+
 }

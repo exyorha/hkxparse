@@ -3,6 +3,7 @@
 
 #include <ios>
 #include "HKXMapping.h"
+#include "HKXTypes.h"
 
 namespace hkxparse {
 	class HKXFile {
@@ -15,11 +16,15 @@ namespace hkxparse {
 		void loadFile(std::istream &stream);
 		void loadFile(HKXMapping &&mapping);
 
+		inline const HKXStructRef &root() const { return m_root; }
+
 	private:
 		void doLoadFile();
 		void parsePackfile();
+		void parseTagfile();
 
 		HKXMapping m_mapping;
+		HKXStructRef m_root;
 	};
 }
 

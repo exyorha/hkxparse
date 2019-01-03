@@ -56,8 +56,8 @@ namespace hkxparse {
 	>;
 
 	struct HKXStruct {
-		std::vector<const char *> classNames;
-		std::unordered_map<const char *, HKXVariant> fields;
+		std::vector<std::string> classNames;
+		std::unordered_map<std::string, HKXVariant> fields;
 	};
 
 	struct HKXArray {

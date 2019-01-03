@@ -38,7 +38,7 @@ namespace hkxparse {
 			else {
 				printValueNoNewLine(" -> ");
 			}
-			printValueNoNewLine(type);
+			printValueNoNewLine(type.c_str());
 		}
 
 		printValue("");
@@ -46,7 +46,7 @@ namespace hkxparse {
 		increaseLevel();
 
 		for (const auto &pair : dictionary.fields) {
-			printKey(pair.first);
+			printKey(pair.first.c_str());
 			print(pair.second);
 		}
 

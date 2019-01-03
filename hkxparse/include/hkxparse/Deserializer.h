@@ -8,11 +8,15 @@
 namespace hkxparse {
 	class Deserializer {
 	public:
+		Deserializer();
 		Deserializer(const LayoutRules &layoutRules, const unsigned char *data, size_t dataSize);
 		~Deserializer();
 
 		Deserializer(const Deserializer &other) = delete;
 		Deserializer &operator =(const Deserializer &other) = delete;
+
+		Deserializer(Deserializer &&other);
+		Deserializer &operator =(Deserializer &&other);
 				
 		void readBytes(unsigned char *target, size_t size);
 		void readBool(bool &val);
@@ -39,6 +43,9 @@ namespace hkxparse {
 		void seekFromMark(size_t offset);
 
 		bool atEnd() const { return m_ptr == m_end; }
+
+		uint8_t readByte();
+		int32_t readVarInt();
 
 	private:
 		LayoutRules m_layoutRules;

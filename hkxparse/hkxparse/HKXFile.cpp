@@ -1,7 +1,8 @@
 #include <hkxparse/HKXFile.h>
 #include <hkxparse/PackfileTypes.h>
 #include <hkxparse/HKXPackfileLoader.h>
-#include <hkxparse/PrettyPrinter.h>
+#include <hkxparse/TagfileTypes.h>
+#include <hkxparse/HKXTagfileParser.h>
 
 #include <fstream>
 
@@ -56,23 +57,27 @@ namespace hkxparse {
 			}
 		}
 
+		if (m_mapping.size() >= sizeof(TagfileHeader)) {
+			const auto &header = *reinterpret_cast<TagfileHeader *>(m_mapping.data());
+			if ((header.magic0 == TagfileMagic0 && header.magic1 == TagfileMagic1) ||
+				(header.magic0 == _byteswap_ulong(TagfileMagic0) && header.magic1 == _byteswap_ulong(TagfileMagic1))) {
+
+				parseTagfile();
+				return;
+			}
+		}
+
 		throw std::runtime_error("hkx container not identified");
 	}
 
 	void HKXFile::parsePackfile() {
 		HKXPackfileLoader loader(m_mapping);
-		auto root = loader.loadRoot();
+		m_root = loader.loadRoot();
+	}
 
-		{
-			std::ofstream stream;
-			stream.exceptions(std::ios::failbit | std::ios::eofbit | std::ios::badbit);
-			stream.open("C:\\projects\\hkxparse\\dump.txt", std::ios::out | std::ios::trunc);
-
-			PrettyPrinter printer(stream);
-			printer.print(root);
-		}
-
-		__debugbreak();
+	void HKXFile::parseTagfile() {
+		HKXTagfileParser parser(m_mapping);
+		m_root = parser.parse();		
 	}
 
 }
