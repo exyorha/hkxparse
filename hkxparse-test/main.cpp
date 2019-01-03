@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[]) {
 	hkxparse::HKXFile file;
-	file.loadFile("C:\\projects\\havok\\skeleton_tag.hkx"); // skeleton_tag
+	file.loadFile("C:\\projects\\havok\\eso.hkx"); // skeleton_tag
 
 	{
 		std::ofstream stream;

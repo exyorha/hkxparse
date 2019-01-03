@@ -27,13 +27,14 @@ namespace hkxparse {
 		TagfileTypeInfo readTypeInfo();
 
 		void parseStruct(HKXStruct &st, int32_t classIndex);
-		void parseStructMembers(HKXStruct &st, const MemberBitmap &bitmap, size_t &firstIndex, const TagfileTypeInfo &typeInfo, int32_t onlyIndex = -1, int32_t arrayPrefix = -1);
-		void parseField(HKXStruct &st, const TagfileMemberInfo &member, int32_t arrayPrefix);
+		void parseStructMembers(HKXStruct &st, const MemberBitmap &bitmap, size_t &firstIndex, const TagfileTypeInfo &typeInfo);
+		void parseField(HKXStruct &st, const TagfileMemberInfo &member);
 		void parseFieldValue(unsigned int type, const std::string &className, HKXVariant &value, int32_t arrayPrefix);
 		size_t countMembers(int32_t classIndex);
 		void parseStructArray(const TagfileMemberInfo &member, HKXArray &ary);
 		int32_t parseArrayPrefix(unsigned int type);
 		const TagfileMemberInfo *structMemberByIndex(const TagfileTypeInfo &typeInfo, size_t index, size_t *firstIndex = nullptr);
+		void parseArray(const TagfileMemberInfo &member, HKXArray &ary);
 
 		HKXMapping &m_mapping;
 		LayoutRules m_rules;

@@ -87,7 +87,7 @@ namespace hkxparse {
 			{
 				auto it = m_objects.find(m_nextAllocatedObject);
 				if (it == m_objects.end()) {
-					printf("Creating new object %d\n", m_nextAllocatedObject);
+					printf("!!!!!!!!!! Creating new object %d\n", m_nextAllocatedObject);
 					auto obj = std::make_shared<HKXStruct>();
 					m_objects.emplace(m_nextAllocatedObject, obj);
 					m_nextAllocatedObject++;
@@ -95,7 +95,7 @@ namespace hkxparse {
 					parseStruct(*obj, 0);
 				}
 				else {
-					printf("Reusing existing object %d\n", m_nextAllocatedObject);
+					printf("!!!!!!!!!! Reusing existing object %d\n", m_nextAllocatedObject);
 					m_nextAllocatedObject++;
 
 					parseStruct(*it->second, 0);
@@ -171,30 +171,31 @@ namespace hkxparse {
 		parseStructMembers(st, memberBitmap, firstIndex, typeInfo);
 	}
 
-	void HKXTagfileParser::parseStructMembers(HKXStruct &st, const MemberBitmap &bitmap, size_t &firstIndex, const TagfileTypeInfo &typeInfo, int32_t onlyIndex, int32_t arrayPrefix) {
+	void HKXTagfileParser::parseStructMembers(HKXStruct &st, const MemberBitmap &bitmap, size_t &firstIndex, const TagfileTypeInfo &typeInfo) {
 		if (typeInfo.parentTypeIndex != 0) {
-			parseStructMembers(st, bitmap, firstIndex, m_types[typeInfo.parentTypeIndex], onlyIndex, arrayPrefix);
+			parseStructMembers(st, bitmap, firstIndex, m_types[typeInfo.parentTypeIndex]);
 		}
 
-		printf("trying %s, first member: %zu, total members: %zu, only index: %d\n", typeInfo.name.c_str(), firstIndex, typeInfo.members.size(), onlyIndex);
+		printf("trying %s, first member: %zu, total members: %zu\n", typeInfo.name.c_str(), firstIndex, typeInfo.members.size());
 
-		if (onlyIndex < 0) {
-			st.classNames.emplace_back(typeInfo.name);
-		}
+		st.classNames.emplace_back(typeInfo.name);
 
-		auto fieldIndex = firstIndex;
 		for (const auto &field : typeInfo.members) {
+			size_t fieldIndex = firstIndex;
 
-			if (((bitmap[fieldIndex / 8] & (1 << (fieldIndex % 8))) && (onlyIndex < 0 || onlyIndex == fieldIndex))) {
+			printf("index %zu: %s\n", fieldIndex, field.name.c_str());
+			if (bitmap[fieldIndex / 8] & (1 << (fieldIndex % 8))) {
 				printf("Field %s is present\n", field.name.c_str());
 
-				parseField(st, field, arrayPrefix);
+				parseField(st, field);
 			}
 
-			fieldIndex++;
+			firstIndex++;
 		}
 
-		firstIndex += typeInfo.members.size();
+		printf("finish with firstIndex %zu\n", firstIndex);
+
+		//firstIndex += typeInfo.members.size();
 	}
 
 	const std::string &HKXTagfileParser::readString() {
@@ -238,15 +239,27 @@ namespace hkxparse {
 		return info;
 	}
 
-	void HKXTagfileParser::parseField(HKXStruct &st, const TagfileMemberInfo &member, int32_t arrayPrefix) {
+	void HKXTagfileParser::parseField(HKXStruct &st, const TagfileMemberInfo &member) {
 		if (member.type & ~(TagArrayFlag | TagTupleFlag | TagBasicTypeMask)) {
 			std::stringstream error;
 			error << "Unsupported flags in field type: " << member.type;
 			throw std::runtime_error(error.str());
 		}
 
+		if (member.type == (TagTupleFlag | TagTypeByte)) {
+			// Special case: byte tuple
 
-		if (member.type & (TagTupleFlag | TagArrayFlag)) {
+			std::vector<unsigned char> bytes(member.tupleSize);
+			m_stream.readBytes(bytes.data(), bytes.size());
+			st.fields.emplace(member.name, std::move(bytes));
+		}
+		else if (member.type == (TagArrayFlag | TagTypeByte)) {
+			// Special case: byte array
+
+			std::vector<unsigned char> bytes(m_stream.readVarInt());
+			m_stream.readBytes(bytes.data(), bytes.size());
+			st.fields.emplace(member.name, std::move(bytes));
+		} else if (member.type & (TagTupleFlag | TagArrayFlag)) {
 			if ((member.type & (TagArrayFlag | TagTupleFlag)) == (TagArrayFlag | TagTupleFlag)) {
 				throw std::logic_error("member is both an array and a tuple");
 			}
@@ -258,33 +271,38 @@ namespace hkxparse {
 				ary.values.resize(member.tupleSize);
 			}
 			else {
-				auto length = m_stream.readVarInt();
-				printf("Array length: %d\n", length);
-				ary.values.resize(length);
+				ary.values.resize(m_stream.readVarInt());
 			}
+			
+			parseArray(member, ary);
 
-			auto prefix = parseArrayPrefix(member.type);
-
-			if ((member.type & TagBasicTypeMask) == TagTypeStruct) {
-				parseStructArray(member, ary);
-			}
-			else {
-				for (auto &value : ary.values) {
-					parseFieldValue(member.type & TagBasicTypeMask, member.className, value, prefix);
-				}
-			}
 		}
 		else {
 			auto result = st.fields.emplace(member.name, std::monostate());			
-			parseFieldValue(member.type & TagBasicTypeMask, member.className, result.first->second, arrayPrefix);
+			parseFieldValue(member.type & TagBasicTypeMask, member.className, result.first->second, -1);
+		}
+	}
+
+	void HKXTagfileParser::parseArray(const TagfileMemberInfo &member, HKXArray &ary) {
+		auto prefix = parseArrayPrefix(member.type);
+
+		if ((member.type & TagBasicTypeMask) == TagTypeStruct) {
+			parseStructArray(member, ary);
+		}
+		else {
+			for (auto &value : ary.values) {
+				parseFieldValue(member.type & TagBasicTypeMask, member.className, value, prefix);
+			}
 		}
 	}
 
 	int32_t HKXTagfileParser::parseArrayPrefix(unsigned int type) {
 		if ((type & TagBasicTypeMask) == TagTypeInt) {
+			printf("int prefix\n");
 			auto arrayItemWidth = m_stream.readVarInt();
 			return arrayItemWidth;
 		} else if ((type & TagBasicTypeMask) == TagTypeVec4) {
+			printf("vec4 prefix\n");
 			auto numberOfMembers = m_stream.readVarInt();
 			return numberOfMembers;
 		}
@@ -422,6 +440,8 @@ namespace hkxparse {
 			return &typeInfo.members[index - *firstIndex];
 		}
 		else {
+			*firstIndex += typeInfo.members.size();
+
 			return nullptr;
 		}
 	}
@@ -473,13 +493,16 @@ namespace hkxparse {
 		for (int32_t index = 0; index < static_cast<int32_t>(memberCount); index++) {
 			if (memberBitmap[index / 8] & (1 << (index % 8))) {
 				auto memberType = structMemberByIndex(typeInfo, index);
-				auto prefix = parseArrayPrefix(memberType->type);
 
-				for (auto &member : ary.values) {
-					auto &st = std::get<HKXStruct>(member);
+				HKXArray view;
+				view.values.resize(ary.values.size());
 
-					size_t firstIndex = 0;
-					parseStructMembers(st, memberBitmap, firstIndex, typeInfo, index, prefix);
+				printf("parsing array for %s\n", memberType->name.c_str());
+
+				parseArray(*memberType, view);
+
+				for (size_t index = 0, size = ary.values.size(); index < size; index++) {
+					std::get<HKXStruct>(ary.values[index]).fields.emplace(memberType->name, std::move(view.values[index]));
 				}
 			}
 		}
